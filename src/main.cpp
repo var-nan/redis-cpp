@@ -7,6 +7,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <poll.h>
+#include <vector>
+#include <thread>
 
 int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
@@ -43,31 +46,32 @@ int main(int argc, char **argv) {
     return 1;
   }
   
-  struct sockaddr_in client_addr;
-  int client_addr_len = sizeof(client_addr);
-  std::cout << "Waiting for a client to connect...\n";
-
-  // You can use print statements as follows for debugging, they'll be visible when running tests.
-  std::cout << "Logs from your program will appear here!\n";
-
-  
-  int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
-  std::cout << "Client connected\n";
-  
-  const char *response = "+PONG\r\n";
-  const size_t BUFFER_SIZE = 256;
-
-  char buffer[BUFFER_SIZE] = {0};
-  std::string ping_msg = "*1\r\n$4\r\nPING\r\n";
-  while (true) {
-    ssize_t nrecieved = recv(client_fd, buffer, ping_msg.size(), 0);
-    if (nrecieved <= 0) {
-      break;
+  auto handle_client = [](int client_fd) {
+    size_t BUFFER_SIZE = 256;
+    std::vector<char> buffer(BUFFER_SIZE);
+    size_t read_pos = 0, buffer_end_pos = 0;
+    std::string response = "+PONG\r\n";
+    while (true) {
+      ssize_t nreceived = recv(client_fd, buffer.data(), buffer.size(), 0);
+      if (nreceived <= 0) break;
+      send(client_fd, response.c_str(), response.size(), 0);
     }
-    ssize_t nsend = send(client_fd, response, strlen(response), 0);
-  }
-  close(client_fd);
-  close(server_fd);
+    close(client_fd);
+  };
 
+  while (true) {
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+    if (client_fd < 0) {
+      std::cerr << "accept failed" << std::endl;
+      continue;
+    }
+
+    std::cout << "Client Connected" << std::endl;
+    std::jthread (handle_client, client_fd).detach();
+  }
+  
+  close(server_fd);
   return 0;
 }
