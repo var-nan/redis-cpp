@@ -8,12 +8,15 @@
 
 set -e # Exit early if any commands fail
 
+export VCPKG_ROOT="/home/biryani/projects/vcpkg"
+
 # Copied from .codecrafters/compile.sh
 #
 # - Edit this to change how your program compiles locally
 # - Edit .codecrafters/compile.sh to change how your program compiles remotely
 (
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
+  echo "root folder ${VCPKG_ROOT}"
   cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
   cmake --build ./build
 )
