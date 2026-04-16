@@ -37,11 +37,13 @@ int main(int argc, char **argv) {
       return -1;
    }
 
-   std::string hello  = "PING";
-   send(sock, hello.c_str(), hello.size(), 0);
-   std::cout << "message sent" << std::endl;
-   ssize_t valread = read(sock, buffer, BUFFER_SIZE);
-   std::cout << "Received: " << buffer << std::endl;
+   for (int i = 0; i < 3; i++) {
+      std::string hello  = "*1\r\n$4\r\nPING\r\n";
+      send(sock, hello.c_str(), hello.size(), 0);
+      std::cout << "message sent" << std::endl;
+      ssize_t valread = read(sock, buffer, BUFFER_SIZE);
+      std::cout << "Received: " << buffer << std::endl;
+   }
    close(sock);
    return 0;
 }

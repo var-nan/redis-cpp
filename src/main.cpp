@@ -55,7 +55,17 @@ int main(int argc, char **argv) {
   std::cout << "Client connected\n";
   
   const char *response = "+PONG\r\n";
-  send(client_fd, response, strlen(response), 0);
+  const size_t BUFFER_SIZE = 256;
+
+  char buffer[BUFFER_SIZE] = {0};
+  std::string ping_msg = "*1\r\n$4\r\nPING\r\n";
+  while (true) {
+    ssize_t nrecieved = recv(client_fd, buffer, ping_msg.size(), 0);
+    if (nrecieved <= 0) {
+      break;
+    }
+    ssize_t nsend = send(client_fd, response, strlen(response), 0);
+  }
   close(client_fd);
   close(server_fd);
 
