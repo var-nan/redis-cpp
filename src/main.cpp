@@ -11,7 +11,20 @@
 #include <vector>
 #include <thread>
 
+#include "Server.hpp"
+
+
 int main(int argc, char **argv) {
+  std::cout << std::unitbuf;
+  std::cerr << std::unitbuf;
+
+  Server server(6379);
+  std::cout << "Server is ready to accept connections \n";
+  server.run();
+  return 0;
+}
+
+int main2(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
@@ -45,15 +58,28 @@ int main(int argc, char **argv) {
     std::cerr << "listen failed\n";
     return 1;
   }
+
+  auto handle_query = [](const std::vector<char> &buff) -> std::string {
+
+    std::vector<std::string> cmd;
+
+    if (cmd[0] == "PING") {
+      return "+PONG\r\n";
+    }
+    else if (cmd[0] == "ECHO") {
+      return "$" + std::to_string(cmd[1].size()) + "\r\n" + cmd[1] + "\r\n";
+    }
+
+    return "";
+  };
   
-  auto handle_client = [](int client_fd) {
-    size_t BUFFER_SIZE = 256;
+  auto handle_client = [&handle_query](int client_fd) {
     std::vector<char> buffer(BUFFER_SIZE);
     size_t read_pos = 0, buffer_end_pos = 0;
-    std::string response = "+PONG\r\n";
     while (true) {
       ssize_t nreceived = recv(client_fd, buffer.data(), buffer.size(), 0);
       if (nreceived <= 0) break;
+      const std::string& response = handle_query(buffer);
       send(client_fd, response.c_str(), response.size(), 0);
     }
     close(client_fd);

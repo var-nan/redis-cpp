@@ -17,7 +17,7 @@ export VCPKG_ROOT="/home/biryani/projects/vcpkg"
 (
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
   echo "root folder ${VCPKG_ROOT}"
-  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
+  cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
   cmake --build ./build
 )
 

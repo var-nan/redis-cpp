@@ -37,12 +37,13 @@ int main(int argc, char **argv) {
       return -1;
    }
 
-   for (int i = 0; i < 3; i++) {
-      std::string hello  = "*1\r\n$4\r\nPING\r\n";
+   for (int i = 0; i < 6; i++) {
+      std::string hello  = "*2\r\n$4\r\nECHO\r\n$3\r\nHe" + std::to_string(i)+"\r\n";
       send(sock, hello.c_str(), hello.size(), 0);
       std::cout << "message sent" << std::endl;
       ssize_t valread = read(sock, buffer, BUFFER_SIZE);
-      std::cout << "Received: " << buffer << std::endl;
+      std::cout << "Received: " << valread << " bytes : " << buffer << std::endl;
+      std::memset(buffer, 0, BUFFER_SIZE);
    }
    close(sock);
    return 0;
