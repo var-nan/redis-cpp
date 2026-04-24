@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
       ssize_t valread = recv(sock, buffer, BUFFER_SIZE, 0);
       // auto resp = parseRESP(std::string(buffer, buffer+valread));
       std::cout << "Received: " << valread << " bytes." << std::endl;
+      std::cout << std::string(buffer, buffer+valread) << std::endl;
       // if (!resp.empty()) std::cout << resp[0] << std::endl;
       std::memset(buffer, 0, BUFFER_SIZE);
       if (valread == 0) return;
@@ -58,15 +59,16 @@ int main(int argc, char **argv) {
 
    {
       for (int i = 0; i < 1; i++) {
-         std::string set_q = "*5\r\n$3\r\nSET\r\n$3\r\nFoo\r\n$3\r\nbar\r\n$2\r\nEX\r\n$1\r\n1\r\n";
+         std::string set_q = "*4\r\n$5\r\nRpush\r\n$3\r\nFoo\r\n$3\r\nCar\r\n$4\r\nNand\r\n";
+         // std::string set_q = "*5\r\n$3\r\nSET\r\n$3\r\nFoo\r\n$3\r\nbar\r\n$2\r\nEX\r\n$1\r\n1\r\n";
          send_q(set_q);
          receive_q();
          // thread sleep?
-         std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+         // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
-         std::string get_q = "*2\r\n$3\r\ngeT\r\n$3\r\nFoo\r\n";
-         send_q(get_q);
-         receive_q();
+         // std::string get_q = "*2\r\n$3\r\ngeT\r\n$3\r\nFoo\r\n";
+         // send_q(get_q);
+         // receive_q();
       }
    }
 

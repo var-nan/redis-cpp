@@ -62,17 +62,39 @@ public:
     explicit GetCommand(SharedDB db) : _db{db}{}
 
     std::string execute(const Tokens& args) override {
-        if (args.size() < 2) return "-ERR wrong number of arguments for 'GET' command \r\n";
+        if (args.size() < 2) return RESP::encodeError("wrong number of arguments for 'GET' command");
         auto result = _db->get(args[1]);
-        if (!result) return "$-1\r\n";
+        if (!result) return RESP::encodeNil();
 
-        return "$" + std::to_string(result->size()) + "\r\n" + result.value() + "\r\n";
+        auto str_ptr = std::get_if<RedisString>(result);
+        if (!str_ptr) return RESP::encodeError("value is not a string");
+        return RESP::encodeBulk(*str_ptr);
     }
 
 private:
     SharedDB _db;
 };
 
+class RPushCommand : public Command {
+public:
+    RPushCommand(SharedDB db): _db{db} {}
+
+    std::string execute(const Tokens& args) override {
+        if (args.size() < 3) 
+            return RESP::encodeError("wrong number of arguments for 'RPUSH' command");
+
+        const RedisKey& key = args[1];
+        auto it = _db->get_or_create(key, RedisList{});
+        auto list_ptr = std::get_if<RedisList>(it);
+        if (!list_ptr) // key already exists, but not of type list.
+            return RESP::encodeError("element is not of type list.");
+        list_ptr->insert(list_ptr->end(), args.begin()+2, args.end());
+        return RESP::encodeInteger(list_ptr->size());
+    }
+
+private:
+    SharedDB _db;
+};
 
 class CommandRouter {
 public:
@@ -81,6 +103,7 @@ public:
         routing_table["ECHO"] = std::make_unique<EchoCommand>();
         routing_table["SET"] = std::make_unique<SetCommand>(_db);
         routing_table["GET"] = std::make_unique<GetCommand>(_db);
+        routing_table["RPUSH"] = std::make_unique<RPushCommand>(_db);
         
         // TODO; add more later.
     }

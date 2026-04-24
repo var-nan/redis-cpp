@@ -3,44 +3,60 @@
 #include <string>
 #include <optional>
 #include <chrono>
+#include <deque>
+
+#include "types.h"
 
 using Clock = std::chrono::steady_clock;
+
+const static Clock::time_point NO_EXPIRY = Clock::time_point::max();
 
 class Value {
 public:
     Value() = default;
-    explicit Value(const std::string& val, Clock::time_point tp): 
-            _value{val}, _expiry{tp} { }
+    explicit Value(RedisType val, Clock::time_point tp): 
+            _value{std::move(val)}, _expiry{tp} { }
 
-    const std::string& getValue() const { return _value; }
+    RedisType& getValue() { return _value; }
     Clock::time_point getExpiryTime() const { return _expiry; }
 private:
-    std::string _value;
-    Clock::time_point _expiry = Clock::time_point::max();
+    RedisType _value;
+    Clock::time_point _expiry;
 };
 
 class DataStore {
 public:
     DataStore() = default;
 
-    void set(const std::string& key, const std::string& value, Clock::time_point tp) {
+    void set(const RedisKey& key, const RedisType& value, Clock::time_point tp = NO_EXPIRY) {
         _store[key] = Value{value, tp};
     }
 
-    std::optional<std::string> get(const std::string& key) {
+    RedisType* get(const RedisKey& key) {
         auto it = _store.find(key);
-        if (it == _store.end()) return std::nullopt;
+        if (it == _store.end()) return nullptr;
         
         auto expiry_time = it->second.getExpiryTime();
         auto current_time = Clock::now();
         if (current_time > expiry_time) { // delete key
             _store.erase(it);
-            return std::nullopt;
+            return nullptr;
         }
-        return it->second.getValue();
+        return &(it->second.getValue());
+    }
+
+    const RedisType* get(const RedisKey& key) const {
+        return get(key);
+    }
+
+    RedisType* get_or_create(const RedisKey& key, RedisType default_val) {
+        auto val_ptr = get(key);
+        if (val_ptr) return val_ptr;
+
+        auto [it,inserted] = _store.emplace(key, Value(std::move(default_val), NO_EXPIRY));
+        return &(it->second.getValue());
     }
 
 private:
-    using Key = std::string;
-    std::unordered_map<Key,Value> _store;
+    std::unordered_map<RedisKey,Value> _store;
 };
