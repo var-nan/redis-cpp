@@ -20,3 +20,11 @@ static std::vector<std::string> parseRESP(const std::string& cmd) {
     }
     return tokens;
 }
+
+static uint64_t getTimeInMillis() {
+    return 0;
+}
+
+static uint64_t getTimeInMicros() {
+    return 0;
+}

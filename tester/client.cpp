@@ -9,6 +9,7 @@
 #include <netdb.h>
 
 #include <vector>
+#include <thread>
 
 
 #define BUFFER_SIZE 256
@@ -56,10 +57,12 @@ int main(int argc, char **argv) {
    };
 
    {
-      for (int i = 0; i < 3; i++) {
-         std::string set_q = "*3\r\n$3\r\nSET\r\n$3\r\nFoo\r\n$3\r\nbar\r\n";
+      for (int i = 0; i < 1; i++) {
+         std::string set_q = "*5\r\n$3\r\nSET\r\n$3\r\nFoo\r\n$3\r\nbar\r\n$2\r\nEX\r\n$1\r\n1\r\n";
          send_q(set_q);
          receive_q();
+         // thread sleep?
+         std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
          std::string get_q = "*2\r\n$3\r\ngeT\r\n$3\r\nFoo\r\n";
          send_q(get_q);

@@ -37,7 +37,19 @@ public:
 
     std::string execute(const Tokens& args) override {
         if (args.size() < 3) return "-ERR wrong number of arguments for 'SET' command \r\n";
-        _db->set(args[1], args[2]);
+
+        Clock::time_point expiry;
+        if (args.size() == 3) {
+            expiry = Clock::time_point::max();
+        } else if (args[3] == "PX" && args.size() == 5) {
+            expiry = Clock::now() + std::chrono::milliseconds(std::stoul(args[4]));
+        } else if (args[3] == "EX" && args.size() == 5) {
+            expiry = Clock::now() + std::chrono::seconds(std::stoul(args[4]));
+        } else {
+            return "-ERR wrong number of arguments for 'SET' command\r\n";
+        }
+
+        _db->set(args[1], args[2], expiry);
         return "+OK\r\n";
     }
 
