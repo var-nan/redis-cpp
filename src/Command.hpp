@@ -36,7 +36,9 @@ public:
     explicit SetCommand(SharedDB db): _db{db} {}
 
     std::string execute(const Tokens& args) override {
-        return "";
+        if (args.size() < 3) return "-ERR wrong number of arguments for 'SET' command \r\n";
+        _db->set(args[1], args[2]);
+        return "+OK\r\n";
     }
 
 private:
@@ -48,7 +50,11 @@ public:
     explicit GetCommand(SharedDB db) : _db{db}{}
 
     std::string execute(const Tokens& args) override {
-        return "";
+        if (args.size() < 2) return "-ERR wrong number of arguments for 'GET' command \r\n";
+        auto result = _db->get(args[1]);
+        if (!result) return "$-1\r\n";
+
+        return "$" + std::to_string(result->size()) + "\r\n" + result.value() + "\r\n";
     }
 
 private:
@@ -58,9 +64,11 @@ private:
 
 class CommandRouter {
 public:
-    CommandRouter() {
+    explicit CommandRouter(SharedDB db): _db{db} {
         routing_table["PING"] = std::make_unique<PingCommand>();
         routing_table["ECHO"] = std::make_unique<EchoCommand>();
+        routing_table["SET"] = std::make_unique<SetCommand>(_db);
+        routing_table["GET"] = std::make_unique<GetCommand>(_db);
         
         // TODO; add more later.
     }
@@ -80,4 +88,5 @@ public:
 
 private:
     std::unordered_map<std::string, std::unique_ptr<Command>> routing_table;
+    SharedDB _db;
 };

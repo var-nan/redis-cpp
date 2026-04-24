@@ -1,5 +1,6 @@
 
 #include "Command.hpp"
+#include "Utils.hpp"
 
 // socket headers
 #include <sys/socket.h>
@@ -10,35 +11,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-
 #define WANT_READ 1
 #define WANT_WRITE 2
 #define WANT_CLOSE 4
 
 #define BUFFER_SIZE 1024
 
-static std::vector<std::string> parseRESP(const std::string& cmd) {
-    if (cmd.empty()) return {};
-
-    size_t current_pos = 1;
-    size_t crlf_pos = cmd.find("\r\n");
-    size_t array_size = std::stoull(cmd.substr(current_pos, crlf_pos-current_pos));
-    current_pos = crlf_pos + 3;  // skip \r\n$
-    std::vector<std::string> tokens;
-    
-    for (size_t i = 0; i < array_size; i++) {
-        crlf_pos = cmd.find("\r\n", current_pos);
-        size_t element_size = std::stoull(cmd.substr(current_pos, (crlf_pos - current_pos)));
-        current_pos = crlf_pos + 2;
-        tokens.push_back(cmd.substr(current_pos, element_size));
-        current_pos += element_size + 3;
-    }
-    return tokens;
-}
 
 class Connection {
 public:
-    explicit Connection(int client_fd): _fd{client_fd} {}
+    explicit Connection(int client_fd): _fd{client_fd} ,intent{0} {}
 
     void appendToReadBuffer(const char *data, size_t len) {
         read_buffer.append(data, len);
@@ -82,7 +64,8 @@ public:
 
 class Server {
 public:
-    Server(int port) {
+    Server(int port) : router{std::make_shared<DataStore>()}{
+
         if((_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             std::cerr << "Failed to create server socket\n";
             return ;
@@ -155,7 +138,7 @@ public:
                     conn->intent = WANT_CLOSE;
                 }
                 if (conn->intent & WANT_CLOSE) {
-                    connections[pollfds[i].fd].reset(nullptr);
+                    connections[pollfds[i].fd] = nullptr;
                 }
             }
         }
@@ -206,7 +189,6 @@ private:
                 conn->intent = WANT_CLOSE;
                 return ;
             } else if (nread == 0) {
-                conn->intent |= WANT_CLOSE;
                 return ;
             }
             conn->appendToReadBuffer(buf, nread);
@@ -219,13 +201,11 @@ private:
 
             auto tokens = parseRESP(cmd);
             std::string response = router.routeCommand(tokens);
-            // std::cout << response << std::endl;
             conn->write_buffer += response;
         }
 
         if (!conn->write_buffer.empty())
             conn->intent |= WANT_WRITE;
-        
     }
 
     void handle_write(Connection *conn) {

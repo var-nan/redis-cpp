@@ -8,8 +8,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include <vector>
+
 
 #define BUFFER_SIZE 256
+
+#include "../src/Utils.hpp"
 
 int main(int argc, char **argv) {
     
@@ -37,7 +41,33 @@ int main(int argc, char **argv) {
       return -1;
    }
 
-   for (int i = 0; i < 6; i++) {
+   auto send_q = [&](const std::string& query) {
+      send(sock, query.c_str(), query.size(), 0);
+      std::cout << "Message sent" << std::endl;
+   };
+
+   auto receive_q = [&]() {
+      ssize_t valread = recv(sock, buffer, BUFFER_SIZE, 0);
+      // auto resp = parseRESP(std::string(buffer, buffer+valread));
+      std::cout << "Received: " << valread << " bytes." << std::endl;
+      // if (!resp.empty()) std::cout << resp[0] << std::endl;
+      std::memset(buffer, 0, BUFFER_SIZE);
+      if (valread == 0) return;
+   };
+
+   {
+      for (int i = 0; i < 3; i++) {
+         std::string set_q = "*3\r\n$3\r\nSET\r\n$3\r\nFoo\r\n$3\r\nbar\r\n";
+         send_q(set_q);
+         receive_q();
+
+         std::string get_q = "*2\r\n$3\r\ngeT\r\n$3\r\nFoo\r\n";
+         send_q(get_q);
+         receive_q();
+      }
+   }
+
+   for (int i = 0; i < 6 && false; i++) {
       std::string hello  = "*2\r\n$4\r\nECHO\r\n$3\r\nHe" + std::to_string(i)+"\r\n";
       send(sock, hello.c_str(), hello.size(), 0);
       std::cout << "message sent" << std::endl;

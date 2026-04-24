@@ -18,86 +18,9 @@ int main(int argc, char **argv) {
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-  Server server(6379);
+  int port = 6379;
+  Server server(port);
   std::cout << "Server is ready to accept connections \n";
   server.run();
-  return 0;
-}
-
-int main2(int argc, char **argv) {
-  // Flush after every std::cout / std::cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
-  
-  int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd < 0) {
-   std::cerr << "Failed to create server socket\n";
-   return 1;
-  }
-  
-  // Since the tester restarts your program quite often, setting SO_REUSEADDR
-  // ensures that we don't run into 'Address already in use' errors
-  int reuse = 1;
-  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-    std::cerr << "setsockopt failed\n";
-    return 1;
-  }
-  
-  struct sockaddr_in server_addr;
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(6379);
-  
-  if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
-    std::cerr << "Failed to bind to port 6379\n";
-    return 1;
-  }
-  
-  int connection_backlog = 5;
-  if (listen(server_fd, connection_backlog) != 0) {
-    std::cerr << "listen failed\n";
-    return 1;
-  }
-
-  auto handle_query = [](const std::vector<char> &buff) -> std::string {
-
-    std::vector<std::string> cmd;
-
-    if (cmd[0] == "PING") {
-      return "+PONG\r\n";
-    }
-    else if (cmd[0] == "ECHO") {
-      return "$" + std::to_string(cmd[1].size()) + "\r\n" + cmd[1] + "\r\n";
-    }
-
-    return "";
-  };
-  
-  auto handle_client = [&handle_query](int client_fd) {
-    std::vector<char> buffer(BUFFER_SIZE);
-    size_t read_pos = 0, buffer_end_pos = 0;
-    while (true) {
-      ssize_t nreceived = recv(client_fd, buffer.data(), buffer.size(), 0);
-      if (nreceived <= 0) break;
-      const std::string& response = handle_query(buffer);
-      send(client_fd, response.c_str(), response.size(), 0);
-    }
-    close(client_fd);
-  };
-
-  while (true) {
-    struct sockaddr_in client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
-    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
-    if (client_fd < 0) {
-      std::cerr << "accept failed" << std::endl;
-      continue;
-    }
-
-    std::cout << "Client Connected" << std::endl;
-    std::jthread (handle_client, client_fd).detach();
-  }
-  
-  close(server_fd);
   return 0;
 }
