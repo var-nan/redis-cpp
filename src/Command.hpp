@@ -36,7 +36,7 @@ public:
     explicit SetCommand(SharedDB db): _db{db} {}
 
     std::string execute(const Tokens& args) override {
-        if (args.size() < 3) return "-ERR wrong number of arguments for 'SET' command \r\n";
+        if (args.size() < 3) return RESP::encodeError("wrong number of arguments for 'SET' command");
 
         Clock::time_point expiry;
         if (args.size() == 3) {
@@ -46,7 +46,7 @@ public:
         } else if (args[3] == "EX" && args.size() == 5) {
             expiry = Clock::now() + std::chrono::seconds(std::stoul(args[4]));
         } else {
-            return "-ERR wrong number of arguments for 'SET' command\r\n";
+            return RESP::encodeError("wrong number of arguments for 'SET' command");
         }
 
         _db->set(args[1], args[2], expiry);
@@ -68,7 +68,7 @@ public:
 
         auto str_ptr = std::get_if<RedisString>(result);
         if (!str_ptr) return RESP::encodeError("value is not a string");
-        return RESP::encodeBulk(*str_ptr);
+        return RESP::encodeStr(*str_ptr);
     }
 
 private:
@@ -96,6 +96,40 @@ private:
     SharedDB _db;
 };
 
+class LRangeCommand : public Command{
+public:
+    LRangeCommand(SharedDB db): _db{db} { }
+
+    std::string execute(const Tokens& args) override {
+        if (args.size() != 4) 
+            return RESP::encodeError("wrong number of arguments for 'LRANGE' command");
+        
+        std::vector<std::string> empty_seq;
+
+        const RedisKey& key = args[1];
+        auto ptr = _db->get(key);
+        if (!ptr) return RESP::encodeSequence(empty_seq.end(), empty_seq.end());
+
+        auto list_ptr = std::get_if<RedisList>(ptr);
+        if (!list_ptr) return RESP::encodeError("element is not of type list.");
+
+        long first = std::stoll(args[2]), last = std::stoll(args[3]);
+        long size = list_ptr->size();
+
+        if (last < 0) last = size + last;
+        if (last < 0) 
+            return RESP::encodeSequence(empty_seq.end(), empty_seq.end());
+        if (first < 0) first = size + first; 
+        if (first < 0) first = 0;
+        if ((first > last) || (first >= size)) // return empty sequence.
+            return RESP::encodeSequence(empty_seq.end(), empty_seq.end());
+        
+        return RESP::encodeSequence(list_ptr->begin()+first, list_ptr->begin()+(last+1));
+    }
+private:
+    SharedDB _db;
+};
+
 class CommandRouter {
 public:
     explicit CommandRouter(SharedDB db): _db{db} {
@@ -104,6 +138,7 @@ public:
         routing_table["SET"] = std::make_unique<SetCommand>(_db);
         routing_table["GET"] = std::make_unique<GetCommand>(_db);
         routing_table["RPUSH"] = std::make_unique<RPushCommand>(_db);
+        routing_table["LRANGE"] = std::make_unique<LRangeCommand>(_db);
         
         // TODO; add more later.
     }

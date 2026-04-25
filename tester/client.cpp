@@ -15,6 +15,7 @@
 #define BUFFER_SIZE 256
 
 #include "../src/Utils.hpp"
+#include "../src/types.h"
 
 int main(int argc, char **argv) {
     
@@ -59,16 +60,17 @@ int main(int argc, char **argv) {
 
    {
       for (int i = 0; i < 1; i++) {
-         std::string set_q = "*4\r\n$5\r\nRpush\r\n$3\r\nFoo\r\n$3\r\nCar\r\n$4\r\nNand\r\n";
-         // std::string set_q = "*5\r\n$3\r\nSET\r\n$3\r\nFoo\r\n$3\r\nbar\r\n$2\r\nEX\r\n$1\r\n1\r\n";
+         std::vector<std::string> tokens = {"Rpush", "Foo", "Car", "Nand", "Gate"};
+         std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
          send_q(set_q);
          receive_q();
          // thread sleep?
          // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
-         // std::string get_q = "*2\r\n$3\r\ngeT\r\n$3\r\nFoo\r\n";
-         // send_q(get_q);
-         // receive_q();
+         std::vector<std::string> tokens2 = {"LRange", "Foo", "-3", "-2"};
+         std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
+         send_q(get_q);
+         receive_q();
       }
    }
 

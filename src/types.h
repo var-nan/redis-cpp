@@ -11,8 +11,28 @@ using RedisSet = std::set<RedisString>;
 using RedisType = std::variant<RedisString, RedisList>;
 
 namespace RESP {
-    inline std::string encodeBulk(const std::string& data) {
+    inline std::string encodeStr(const std::string& data) {
         return "$" + std::to_string(data.size()) + "\r\n" + data + "\r\n";
+    }
+
+    template <typename It>
+    inline std::string encodeSequence(It first, It last) {
+        size_t n_chars = 0, n_elements = 0;
+        for (It current = first; current != last; ++current) {
+            n_chars += current->size();
+            n_elements++;
+        }
+
+        // 8 chars per element ($<len>\r\n<element>\r\n)
+        size_t space_required = n_chars + (n_elements * 8) + 6;
+        std::string result;
+        result.reserve(space_required);
+        result += "*" + std::to_string(n_elements) + "\r\n";
+
+        for (It current = first; current != last; ++current) {
+            result += encodeStr(*current);
+        }
+        return result;
     }
 
     inline std::string encodeError(const std::string& msg) {
