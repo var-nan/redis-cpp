@@ -162,7 +162,7 @@ public:
 
         const RedisKey& key = args[1];
         auto ptr = _db->get(key);
-        if (!ptr) return RESP::encodeNil();
+        if (!ptr) return RESP::encodeInteger(0);
 
         auto list_ptr = std::get_if<RedisList>(ptr);
         if (!list_ptr) return RESP::encodeError("value is not of type list");
