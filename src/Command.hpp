@@ -138,7 +138,7 @@ public:
     std::string execute(const Tokens& args) override {
         if (args.size() < 3) return RESP::encodeError("wrong number of arguments for 'LPUSH' command");
 
-        const RedisKey& key = args[0];
+        const RedisKey& key = args[1];
         auto ptr = _db->get_or_create(key, RedisList{}, NO_EXPIRY);
 
         auto list_ptr = std::get_if<RedisList>(ptr);
