@@ -84,7 +84,7 @@ public:
             return RESP::encodeError("wrong number of arguments for 'RPUSH' command");
 
         const RedisKey& key = args[1];
-        auto it = _db->get_or_create(key, RedisList{});
+        auto it = _db->get_or_create(key, RedisList{}, NO_EXPIRY);
         auto list_ptr = std::get_if<RedisList>(it);
         if (!list_ptr) // key already exists, but not of type list.
             return RESP::encodeError("element is not of type list.");
@@ -131,6 +131,28 @@ private:
     SharedDB _db;
 };
 
+class LPushCommand : public Command {
+public:
+    LPushCommand(SharedDB db): _db{db} { }
+
+    std::string execute(const Tokens& args) override {
+        if (args.size() < 3) return RESP::encodeError("wrong number of arguments for 'LPUSH' command");
+
+        const RedisKey& key = args[0];
+        auto ptr = _db->get_or_create(key, RedisList{}, NO_EXPIRY);
+
+        auto list_ptr = std::get_if<RedisList>(ptr);
+        if (!list_ptr) return RESP::encodeError("value is not of type list");
+
+        for (size_t i = 2; i < args.size(); i++) {
+            list_ptr->emplace_front(args[i]);
+        }
+        return RESP::encodeInteger(list_ptr->size());
+    }
+private:
+    SharedDB _db;
+};
+
 class CommandRouter {
 public:
     explicit CommandRouter(SharedDB db): _db{db} {
@@ -140,6 +162,7 @@ public:
         routing_table["GET"] = std::make_unique<GetCommand>(_db);
         routing_table["RPUSH"] = std::make_unique<RPushCommand>(_db);
         routing_table["LRANGE"] = std::make_unique<LRangeCommand>(_db);
+        routing_table["LPUSH"] = std::make_unique<LPushCommand>(_db);
         
         // TODO; add more later.
     }

@@ -49,11 +49,11 @@ public:
         return get(key);
     }
 
-    RedisType* get_or_create(const RedisKey& key, RedisType default_val) {
+    RedisType* get_or_create(const RedisKey& key, RedisType default_val, Clock::time_point tp) {
         auto val_ptr = get(key);
         if (val_ptr) return val_ptr;
 
-        auto [it,inserted] = _store.emplace(key, Value(std::move(default_val), NO_EXPIRY));
+        auto [it,inserted] = _store.emplace(key, Value(std::move(default_val), tp));
         return &(it->second.getValue());
     }
 
