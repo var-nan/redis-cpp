@@ -186,13 +186,24 @@ public:
 
         const RedisKey& key = args[1];
         auto ptr = _db->get(key);
-        if (!ptr) return RESP::encodeNil();
+        if (!ptr || (n == 0)) return RESP::encodeNil();
 
         auto list_ptr = std::get_if<RedisList>(ptr);
         if (!list_ptr) return RESP::encodeError("value is not of type list");
+        if (list_ptr->empty()) return RESP::encodeNil();
 
         n = std::min(n, static_cast<long>(list_ptr->size()));
-        return RESP::encodeSequence(list_ptr->begin(), list_ptr->begin()+n);
+        
+        if (n == 1) {
+            auto response = RESP::encodeStr(list_ptr->front());
+            list_ptr->pop_front();
+            return response;
+        }
+        auto response = RESP::encodeSequence(list_ptr->begin(), list_ptr->begin()+n);
+        for (size_t i = 0; i < n; i++) {
+            list_ptr->pop_front();
+        }
+        return response;
     }
 private:
     SharedDB _db;
