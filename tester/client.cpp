@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
          // thread sleep?
          // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
-         std::vector<std::string> tokens2 = {"LRange", "blueberry", "0", "10"};
+         std::vector<std::string> tokens2 = {"LPOP", "blueberry", "10"};
          std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
          send_q(get_q);
          receive_q();
