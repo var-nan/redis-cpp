@@ -115,6 +115,7 @@ public:
 
         long first = std::stoll(args[2]), last = std::stoll(args[3]);
         long size = list_ptr->size();
+        if (last > 0 && last >= size) last = size-1;
 
         if (last < 0) last = size + last;
         if (last < 0) 

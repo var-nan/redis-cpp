@@ -60,14 +60,15 @@ int main(int argc, char **argv) {
 
    {
       for (int i = 0; i < 1; i++) {
-         std::vector<std::string> tokens = {"Rpush", "Foo", "Car", "Nand", "Gate"};
+         std::vector<std::string> tokens = {"Rpush", "blueberry", "blueberry", "banana", "pear", 
+                  "strawberrry", "raspberry","grape"};
          std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
          send_q(set_q);
          receive_q();
          // thread sleep?
          // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
-         std::vector<std::string> tokens2 = {"LRange", "Foo", "-3", "-2"};
+         std::vector<std::string> tokens2 = {"LRange", "blueberry", "0", "10"};
          std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
          send_q(get_q);
          receive_q();
