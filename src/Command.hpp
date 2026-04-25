@@ -153,6 +153,26 @@ private:
     SharedDB _db;
 };
 
+class LLenCommand : public Command {
+public:
+    LLenCommand(SharedDB db): _db{db} { }
+
+    std::string execute(const Tokens& args) override {
+        if (args.size() != 2) return RESP::encodeError("wrong number of arguments for 'LLEN' command");
+
+        const RedisKey& key = args[1];
+        auto ptr = _db->get(key);
+        if (!ptr) return RESP::encodeNil();
+
+        auto list_ptr = std::get_if<RedisList>(ptr);
+        if (!list_ptr) return RESP::encodeError("value is not of type list");
+
+        return RESP::encodeInteger(list_ptr->size());
+    }
+private:
+    SharedDB _db;
+};
+
 class CommandRouter {
 public:
     explicit CommandRouter(SharedDB db): _db{db} {
@@ -163,6 +183,7 @@ public:
         routing_table["RPUSH"] = std::make_unique<RPushCommand>(_db);
         routing_table["LRANGE"] = std::make_unique<LRangeCommand>(_db);
         routing_table["LPUSH"] = std::make_unique<LPushCommand>(_db);
+        routing_table["LLEN"] = std::make_unique<LLenCommand>(_db);
         
         // TODO; add more later.
     }
