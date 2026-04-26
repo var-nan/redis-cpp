@@ -62,16 +62,33 @@ public:
     std::string write_buffer;
 };
 
+struct BlockedClient {
+    Connection *conn;
+    CommandType cmd_type;
+    std::vector<std::string> cmd_args; // command arguments 
+    Clock::time_point timeout;
+
+    BlockedClient (Connection *c, CommandType cmd, std::vector<std::string> args, 
+        Clock::time_point tp = NO_EXPIRY): conn{c}, cmd_type{cmd} , 
+        cmd_args{std::move(args)} , timeout{tp} {}
+};
+
+struct ConnectionTimeoutComparator {
+    bool operator()(const BlockedClient *a, const BlockedClient *b) const {
+        return (a->timeout == b->timeout) ? (a->conn->_fd < b->conn->_fd) : (a->timeout < b->timeout);
+    }
+};
+
 class Server {
 public:
-    Server(int port) : router{std::make_shared<DataStore>()}{
+    Server(int port) : router_{std::make_shared<DataStore>()} {
 
-        if((_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        if((fd_ = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             std::cerr << "Failed to create server socket\n";
             return ;
         }
         int reuse = 1;
-        if (setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        if (setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
             std::cerr << "setsockopt failed\n";
             return ;
         }
@@ -80,157 +97,34 @@ public:
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(port);
-        if (bind(_fd, (const struct sockaddr *)&addr, sizeof(addr))) {
+        if (bind(fd_, (const struct sockaddr *)&addr, sizeof(addr))) {
             std::cerr << "bind()" << std::endl;
             return ;
         }
 
-        if (listen(_fd, SOMAXCONN)) {
+        if (listen(fd_, SOMAXCONN)) {
             std::cerr << "listen() " << std::endl;
             return ;
         }
-        set_non_block(_fd);
+        set_non_block(fd_);
         // server ready to accept connections.
     }
 
-    void run() {
-
-        std::vector<struct pollfd> pollfds;
-        int timeout = -1;
-        for ( ; ; ) {
-
-            pollfds.clear();
-            
-            struct pollfd pfd = {_fd, POLLIN, 0};
-            pollfds.push_back(pfd); // server socket.
-            
-            for (const auto &conn : connections) {
-                if (!conn) continue;
-
-                struct pollfd pfd = {conn->_fd, POLLERR, 0};
-                pfd.events = (conn->intent & WANT_READ) ? (pfd.events | POLLIN) : pfd.events;
-                pfd.events = (conn->intent & WANT_WRITE) ? (pfd.events | POLLOUT) : pfd.events;
-                pollfds.push_back(pfd);
-            }
-
-            // TODO: change to epoll later.
-            int nready = poll(pollfds.data(), (nfds_t) pollfds.size(), timeout);
-            if (nready < 0 && errno == EINTR) {
-                continue;
-                // handle error.
-            } else if (nready == 0) continue;
-            
-            // TODO: handle EINTR signal.
-            if (pollfds[0].revents) {
-                acceptConnection();
-            }
-            // iterate through all connections
-            for (int i = 1; i < pollfds.size(); i++) {
-                auto revents = pollfds[i].revents;
-                auto& conn = connections[pollfds[i].fd];
-                if (revents & POLLIN) {
-                    handle_read(conn.get());
-                }
-                if (revents & POLLOUT) {
-                    handle_write(conn.get());
-                }
-                if (revents & (POLLERR | POLLHUP)) {
-                    conn->intent = WANT_CLOSE;
-                }
-                if (conn->intent & WANT_CLOSE) {
-                    connections[pollfds[i].fd] = nullptr;
-                }
-            }
-        }
-    }
+    void run(); // event-loop on the connections.
 
 private:
-    int _fd;
-    std::vector<std::unique_ptr<Connection>> connections;
-    CommandRouter router;
+    int fd_;
+    std::vector<std::unique_ptr<Connection>> connections_;
+    CommandRouter router_;
+    std::unordered_map<std::string, std::deque<std::unique_ptr<BlockedClient>>> waiting_queue_;
+    std::set<BlockedClient *, ConnectionTimeoutComparator> global_timeouts_;
+    std::deque<std::string> ready_keys_;
 
-    void acceptConnection() {
-        struct sockaddr_in client_addr = {};
-        socklen_t addrlen = sizeof(client_addr);
-        int clientfd = accept(_fd, (struct sockaddr *)&client_addr, &addrlen);
-        if (clientfd < 0) {
-            return ;
-        }
-        uint32_t ip = client_addr.sin_addr.s_addr;
-        std::cout << "Client Connected: " <<
-            (ip&255) << "." << ((ip>>8)&255) << "." << ((ip>>16)&255) << "." << (ip>>24) 
-            << std::endl;
-
-        set_non_block(clientfd);
-
-        std::unique_ptr<Connection> conn = std::make_unique<Connection>(clientfd);
-        conn->intent |= WANT_READ;
-        // insert to map
-        if (clientfd >= connections.size()) {
-            connections.resize(clientfd + 1);
-        }
-        connections[clientfd] = std::move(conn);
-    }
-
-    void set_non_block(int fd) {
-        int flags = fcntl(fd, F_GETFL, 0);
-        flags  |= O_NONBLOCK;
-        int rv = fcntl(fd, F_SETFL, flags);
-        // TODO : handle error.
-    }
-
-    void handle_read(Connection *conn) {
-        char buf[BUFFER_SIZE];
-
-        while (true) {
-            ssize_t nread = recv(conn->_fd, buf, sizeof(buf), 0);
-            if (nread < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) break;
-                conn->intent = WANT_CLOSE;
-                return ;
-            } else if (nread == 0) {
-                return ;
-            }
-            conn->appendToReadBuffer(buf, nread);
-        }
-
-        size_t cmd_size;
-        while ((cmd_size = conn->getCompleteCommandSize()) > 0) {
-            std::string cmd = conn->read_buffer.substr(0, cmd_size);
-            conn->read_buffer.erase(0, cmd_size);
-
-            auto tokens = parseRESP(cmd);
-            std::string response = router.routeCommand(tokens);
-            conn->write_buffer += response;
-        }
-
-        if (!conn->write_buffer.empty())
-            conn->intent |= WANT_WRITE;
-    }
-
-    void handle_write(Connection *conn) {
-        const char *buf = conn->write_buffer.data();
-        size_t buffer_size = conn->write_buffer.size();
-        size_t nleft = buffer_size;
-
-        while (nleft > 0) {
-            ssize_t nwrite = write(conn->_fd, buf, nleft);
-            if (nwrite < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // OS socket buffer is full. Retry later. Keep the intent.
-                    break;
-                } else {
-                    conn->intent |=  WANT_CLOSE;
-                    return ;
-                }
-            }
-            buf += nwrite;
-            nleft -= nwrite;
-        }
-        // remove string from beginning
-        conn->write_buffer.erase(0, buffer_size-nleft);
-        if (nleft != 0){
-            conn->intent |= WANT_WRITE;
-        }
-    }
+    void acceptConnection();
+    void set_non_block(int fd);
+    void handle_read(Connection *conn);
+    void handle_write(Connection *conn); 
+    void process_ready_keys();
+    void check_global_timeouts();
+    void handle_disconnect(Connection *conn);
 };

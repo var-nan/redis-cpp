@@ -1,6 +1,8 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <set>
+#include <unordered_map>
 
 static std::vector<std::string> parseRESP(const std::string& cmd) {
     if (cmd.empty()) return {};
@@ -28,3 +30,20 @@ static uint64_t getTimeInMillis() {
 static uint64_t getTimeInMicros() {
     return 0;
 }
+
+/*
+    We have routeCommand() in CommandRouter class. That will return string. I'll modify that to return status along
+    with the response. This status is an enum and can only be in either of the states SUCCESS, BLOCKED, SIGNAL
+
+    if (SUCCESS) normal operation. No need to do anything.
+    if (BLOCKED): Current operation is a waiting for data to come. insert to waiting_queue.
+    if (SIGNAL): added some data to the list/sequence. Go and process pending requests in waiting_queue if any.
+
+    IN addition, the main thread maintains a priority_queue of connections that have blocking time for this key
+    . When the waiting time exceeded, the main thread should take out the request from the priority_queue and 
+    return response to the client with empty string and close the connection.
+
+    When the status was SIGNAL from the routeCommand, the main thread first writes the response to the write buffer
+    of current connection then note down about this key. In the next iteration of event loop, the thread first checks
+    if any of the keys become ready, and completes those requests that are currently waiting.
+*/

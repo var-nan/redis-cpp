@@ -2,6 +2,7 @@
 #include <deque>
 #include <variant>
 #include <set>
+#include <array>
 
 using RedisString = std::string;
 using RedisKey = std::string;
@@ -43,11 +44,20 @@ namespace RESP {
         return "$-1\r\n";
     }
 
+    inline std::string encodeNilArray() {
+        return "*-1\r\n";
+    }
+
     inline std::string encodeOK() {
         return "+OK\r\n";
     }
 
     inline std::string encodeInteger(long val) {
         return ":" + std::to_string(val) + "\r\n";
+    }
+
+    inline std::string encodeKVPair(const std::string& k, const std::string& val) {
+        std::array<std::string, 2> kv_pair = {k, val};
+        return encodeSequence(kv_pair.begin(), kv_pair.end());
     }
 }

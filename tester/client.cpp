@@ -51,37 +51,37 @@ int main(int argc, char **argv) {
    auto receive_q = [&]() {
       ssize_t valread = recv(sock, buffer, BUFFER_SIZE, 0);
       // auto resp = parseRESP(std::string(buffer, buffer+valread));
+      for (ssize_t i = 0; i < valread; i++) {
+         if ((buffer[i] == '\r') || (buffer[i] == '\n')) buffer[i] = ' ';
+      }
       std::cout << "Received: " << valread << " bytes." << std::endl;
       std::cout << std::string(buffer, buffer+valread) << std::endl;
       // if (!resp.empty()) std::cout << resp[0] << std::endl;
       std::memset(buffer, 0, BUFFER_SIZE);
       if (valread == 0) return;
    };
+   
+   auto encode = [](const std::vector<std::string>& args) {
+      return RESP::encodeSequence(args.begin(), args.end());
+   };
 
    {
       for (int i = 0; i < 1; i++) {
-         std::vector<std::string> tokens = {"Rpush", "blueberry", "blueberry", "banana", "pear", 
-                  "strawberrry", "raspberry","grape"};
+         std::vector<std::string> tokens = {"Rpush", "blueberry", "banana"};
          std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
          send_q(set_q);
          receive_q();
-         // thread sleep?
-         // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
-         std::vector<std::string> tokens2 = {"LPOP", "blueberry", "100"};
-         std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
-         send_q(get_q);
-         receive_q();
+         // std::vector<std::string> tokens2 = {"LPOP", "blueberry", "100"};
+         // std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
+         // send_q(get_q);
+         // receive_q();
+
+         // std::vector<std::string> tokens3 = {"BLPOP", "blueberry", "20"};
+         // std::string get_q = encode(tokens3);
+         // send_q(get_q);
+         // receive_q();
       }
-   }
-
-   for (int i = 0; i < 6 && false; i++) {
-      std::string hello  = "*2\r\n$4\r\nECHO\r\n$3\r\nHe" + std::to_string(i)+"\r\n";
-      send(sock, hello.c_str(), hello.size(), 0);
-      std::cout << "message sent" << std::endl;
-      ssize_t valread = read(sock, buffer, BUFFER_SIZE);
-      std::cout << "Received: " << valread << " bytes : " << buffer << std::endl;
-      std::memset(buffer, 0, BUFFER_SIZE);
    }
    close(sock);
    return 0;
