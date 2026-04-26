@@ -27,7 +27,7 @@ CommandResult TypeCommand::execute(const Tokens& args) {
     const RedisKey& key = args[1];
 
     auto ptr = db_->get(key);
-    if (!ptr) return {RESP::encodeStr("none")};
+    if (!ptr) return {RESP::encodeSimpleString("none")};
 
     if (std::holds_alternative<RedisString>(*ptr)) return RESP::encodeSimpleString("string");
     return RESP::encodeSimpleString("list");
