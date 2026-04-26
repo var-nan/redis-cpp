@@ -52,6 +52,10 @@ namespace RESP {
         return "+OK\r\n";
     }
 
+    inline std::string encodeSimpleString(const std::string& str) {
+        return "+"+str+"\r\n";
+    }
+
     inline std::string encodeInteger(long val) {
         return ":" + std::to_string(val) + "\r\n";
     }

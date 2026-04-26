@@ -19,3 +19,16 @@ CommandResult BLPopCommand::execute(const Tokens& args) {
     list_ptr->pop_front();
     return {response};
 }
+
+CommandResult TypeCommand::execute(const Tokens& args) {
+    if (args.size() != 2) 
+        return {RESP::encodeError("wrong number of arguments for 'TYPE' command")};
+
+    const RedisKey& key = args[1];
+
+    auto ptr = db_->get(key);
+    if (!ptr) return {RESP::encodeStr("none")};
+
+    if (std::holds_alternative<RedisString>(*ptr)) return RESP::encodeSimpleString("string");
+    return RESP::encodeSimpleString("list");
+}

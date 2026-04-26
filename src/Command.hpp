@@ -277,6 +277,16 @@ private:
     SharedDB db_;
 };
 
+class TypeCommand : public Command {
+public:
+    TypeCommand(SharedDB db): db_{db} { }
+
+    CommandResult execute(const Tokens& args) override;
+
+private:
+    SharedDB db_;
+};
+
 enum CommandType {
     PING,
     ECHO,
@@ -290,6 +300,7 @@ enum CommandType {
     BLPOP,
     LLEN,
     NONE,
+    TYPE,
 };
 
 class CommandRouter {
@@ -307,6 +318,7 @@ public:
         command_table_["LLEN"] = CommandType::LLEN;
         command_table_["LPOP"] = CommandType::LPOP;
         command_table_["BLPOP"] = CommandType::BLPOP;
+        command_table_["TYPE"] = CommandType::TYPE;
 
         routing_table_[command_table_["PING"]] = std::make_unique<PingCommand>();
         routing_table_[command_table_["ECHO"]] = std::make_unique<EchoCommand>();
@@ -318,6 +330,7 @@ public:
         routing_table_[command_table_["LLEN"]] = std::make_unique<LLenCommand>(db_);
         routing_table_[command_table_["LPOP"]] = std::make_unique<LPopCommand>(db_);
         routing_table_[command_table_["BLPOP"]] = std::make_unique<BLPopCommand>(db_);
+        routing_table_[command_table_["TYPE"]] = std::make_unique<TypeCommand>(db_);
         
         // TODO; add more later.
     }

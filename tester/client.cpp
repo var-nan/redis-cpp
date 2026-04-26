@@ -71,7 +71,16 @@ int main(int argc, char **argv) {
          std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
          send_q(set_q);
          receive_q();
+         
+         std::vector<std::string> tokens2 = {"TYPE", "blueberry"};
+         std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
+         send_q(get_q);
+         receive_q();
 
+         tokens2 = {"TYPE", "blackberry"};
+         get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
+         send_q(get_q);
+         receive_q();
          // std::vector<std::string> tokens2 = {"LPOP", "blueberry", "100"};
          // std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
          // send_q(get_q);
