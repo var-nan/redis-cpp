@@ -7,9 +7,7 @@ CommandResult BLPopCommand::execute(const Tokens& args) {
     const RedisKey& key = args[1];
     auto timeout = static_cast<long>(std::stod(args.back()) * 1000);
 
-    auto ptr = db_->get(key);
-    if (!ptr) return {RESP::encodeNil()};
-
+    auto ptr = db_->get_or_create(key, RedisList{}, NO_EXPIRY);
     auto list_ptr = std::get_if<RedisList>(ptr);
     if (!list_ptr) return {RESP::encodeError("value is not of type list")};
 
