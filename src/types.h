@@ -3,13 +3,18 @@
 #include <variant>
 #include <set>
 #include <array>
+#include <functional>
+#include <string_view>
+
+#include "include/RedisStream.hpp"
 
 using RedisString = std::string;
 using RedisKey = std::string;
 using RedisList = std::deque<RedisString>;
 using RedisSet = std::set<RedisString>;
+using RedisInteger = int64_t;
 
-using RedisType = std::variant<RedisString, RedisList>;
+using RedisType = std::variant<RedisString, RedisList, RedisInteger>;
 
 namespace RESP {
     inline std::string encodeStr(const std::string& data) {

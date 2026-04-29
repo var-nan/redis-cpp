@@ -81,7 +81,7 @@ struct ConnectionTimeoutComparator {
 
 class Server {
 public:
-    Server(int port) : router_{std::make_shared<DataStore>()} {
+    Server(int port) : db_{std::make_unique<DataStore>()}, router_{db_.get()} {
 
         if((fd_ = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             std::cerr << "Failed to create server socket\n";
@@ -113,6 +113,7 @@ public:
     void run(); // event-loop on the connections.
 
 private:
+    std::unique_ptr<DataStore> db_;
     int fd_;
     std::vector<std::unique_ptr<Connection>> connections_;
     CommandRouter router_;

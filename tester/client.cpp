@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <thread>
+#include <climits>
 
 
 #define BUFFER_SIZE 256
@@ -67,29 +68,16 @@ int main(int argc, char **argv) {
 
    {
       for (int i = 0; i < 1; i++) {
-         std::vector<std::string> tokens = {"Rpush", "blueberry", "banana"};
+         std::vector<std::string> tokens = {"set", "foo", "axy"};
          std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
          send_q(set_q);
          receive_q();
          
-         std::vector<std::string> tokens2 = {"TYPE", "blueberry"};
+         std::vector<std::string> tokens2 = {"incr", "foo"};
          std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
          send_q(get_q);
          receive_q();
-
-         tokens2 = {"TYPE", "blackberry"};
-         get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
-         send_q(get_q);
-         receive_q();
-         // std::vector<std::string> tokens2 = {"LPOP", "blueberry", "100"};
-         // std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
-         // send_q(get_q);
-         // receive_q();
-
-         // std::vector<std::string> tokens3 = {"BLPOP", "blueberry", "20"};
-         // std::string get_q = encode(tokens3);
-         // send_q(get_q);
-         // receive_q();
+         
       }
    }
    close(sock);

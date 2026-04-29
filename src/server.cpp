@@ -57,7 +57,7 @@ void Server::process_ready_keys() {
                 q.pop_front();
                 continue;
             }
-            auto cmd_response = router_.routeCommand(blocked_client->cmd_args);
+            auto cmd_response = router_.routeCommand(blocked_client->cmd_args, conn->_fd);
             // if the list becomes (by other thread), the current request becomes blocked again,
             // so keep this client in waiting list and exit loop.
             if (cmd_response.status == CommandStatus::BLOCKED) break;
@@ -157,7 +157,7 @@ void Server::handle_read(Connection *conn) {
         conn->read_buffer.erase(0, cmd_size);
 
         auto tokens = parseRESP(cmd);
-        auto cmd_response = router_.routeCommand(tokens);
+        auto cmd_response = router_.routeCommand(tokens, conn->_fd);
         // if the command is blocked, put the client to key's waiting queue and add to global timeout queue.
         if (cmd_response.status == CommandStatus::BLOCKED) {
             const RedisKey& key = cmd_response.keys[0];

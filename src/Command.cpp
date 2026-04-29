@@ -32,3 +32,40 @@ CommandResult TypeCommand::execute(const Tokens& args) {
     if (std::holds_alternative<RedisString>(*ptr)) return RESP::encodeSimpleString("string");
     return RESP::encodeSimpleString("list");
 }
+
+// CommandResult XAddCommand::execute(const Tokens& args) {
+//     if (args.size() != 2)
+//         return {RESP::encodeError("wrong number of arguments for 'XADD' command")};
+
+//     const RedisString& key = args[1];
+//     auto ptr = db_->get_or_create(key, RedisStream{}, NO_EXPIRY);
+
+//     auto stream_ptr = std::get_if<RedisStream>(ptr);
+//     if (!stream_ptr) 
+//         return {RESP::encodeError("value is not of type stream")};
+    
+//     // parse the arguements
+//     StreamPayload payload;
+//     std::string id;
+//     stream_ptr->addEntry(id, payload);
+// }
+
+CommandResult IncrCommand::execute(const Tokens& args) {
+    if (args.size() != 2) 
+        return {RESP::encodeError("wrong number of arguments for 'INCR' command")};
+
+    const RedisString& key = args[1];
+    auto ptr = db_->get_or_create(key, RedisString{"0"}, NO_EXPIRY);
+    
+    auto *str_ptr = std::get_if<RedisString>(ptr);
+
+    RedisInteger value;
+    const auto *f = str_ptr->data();
+    const auto *l = f + str_ptr->size();
+    if (!(std::from_chars(f, l, value).ec == std::errc{}))
+        return {RESP::encodeError("value is not an integer or out of range")};
+
+    value++;
+    *str_ptr = std::to_string(value);
+    return {RESP::encodeInteger(value)};
+}

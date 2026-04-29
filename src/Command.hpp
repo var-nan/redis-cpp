@@ -8,7 +8,7 @@
 #include "DataStore.hpp"
 
 using Tokens = std::vector<std::string>;
-using SharedDB = std::shared_ptr<DataStore>;
+using SharedDB = DataStore *;
 
 enum CommandStatus { SUCCESS, BLOCKED, SIGNAL, CLOSE };
 
@@ -33,6 +33,10 @@ public:
     virtual std::string getTimeoutResponse() const {
         return RESP::encodeNil();
     }
+    virtual std::string validateArgs(const Tokens& args) const {
+        return "";
+    }
+
 };
 
 class EchoCommand : public Command {
@@ -287,6 +291,23 @@ private:
     SharedDB db_;
 };
 
+
+/**
+ * Increments the number stored at key by one. If the key does not exist, it is set to 0 
+ * before performing the operation. An error is returned if the key contains a value of 
+ * the wrong type or contains a string that can not be represented as integer. 
+ * This operation is an Atomic operation and is limited to 64 bit signed integers.
+ */
+class IncrCommand : public Command {
+public:
+    IncrCommand (SharedDB db) : db_{db} { }
+
+    CommandResult execute(const Tokens& args) override;
+private:
+    SharedDB db_;
+};
+
+
 enum CommandType {
     PING,
     ECHO,
@@ -301,6 +322,15 @@ enum CommandType {
     LLEN,
     NONE,
     TYPE,
+    INCR,
+    MULTI,
+    EXEC,
+    DISCARD,
+};
+
+struct TransactionState {
+    bool is_active = false;
+    std::vector<std::pair<Command *, Tokens>> command_queue;
 };
 
 class CommandRouter {
@@ -319,6 +349,7 @@ public:
         command_table_["LPOP"] = CommandType::LPOP;
         command_table_["BLPOP"] = CommandType::BLPOP;
         command_table_["TYPE"] = CommandType::TYPE;
+        command_table_["MULTI"] = CommandType::MULTI;
 
         routing_table_[command_table_["PING"]] = std::make_unique<PingCommand>();
         routing_table_[command_table_["ECHO"]] = std::make_unique<EchoCommand>();
@@ -331,11 +362,12 @@ public:
         routing_table_[command_table_["LPOP"]] = std::make_unique<LPopCommand>(db_);
         routing_table_[command_table_["BLPOP"]] = std::make_unique<BLPopCommand>(db_);
         routing_table_[command_table_["TYPE"]] = std::make_unique<TypeCommand>(db_);
+        routing_table_[command_table_["INCR"]] = std::make_unique<IncrCommand>(db_);
         
         // TODO; add more later.
     }
 
-    CommandResult routeCommand(const Tokens& tokens) {
+    CommandResult routeCommand(const Tokens& tokens, int fd) {
         if (tokens.empty()) return RESP::encodeError("empty command");
         
         std::string command_name = tokens[0];
@@ -345,6 +377,33 @@ public:
         auto it = command_table_.find(command_name);
         if (it == command_table_.end()) return "-ERR unknown command '" + command_name + "' \r\n";
 
+        // if (it->second == CommandType::MULTI) {
+        //     // if (transactions_[fd]->is_active) ? if already a transaction exist? 
+        //     transactions_[fd]->is_active = true;
+        //     return {RESP::encodeSimpleString("OK")};
+        // } else if (it->second == CommandType::EXEC) {
+        //     // return error if no active transaction found.
+        //     // execute transaction.
+        //     auto txn_ptr = transactions_[fd].get();
+        //     std::vector<std::string> cmd_results;
+        //     cmd_results.reserve(txn_ptr->command_queue.size());
+            
+        //     for (const auto& [cmd, args] : txn_ptr->command_queue) {
+        //         cmd_results.push_back(std::move(cmd->execute(args).response));
+        //     }
+        //     return {RESP::encodeSequence(cmd_results.begin(), cmd_results.end())}; 
+        // } else if (it->second == CommandType::DISCARD) {
+        //     auto txn_ptr = transactions_[fd].get();
+        //     if (!txn_ptr->is_active) return {RESP::encodeError("DISCARD without MULTI")};
+        //     // clear transaction state.
+        //     txn_ptr->is_active = false;
+        //     txn_ptr->command_queue.clear();
+        //     return {RESP::encodeSimpleString("OK")};
+        // } else if (transactions_[fd]->is_active) {
+        //     // No need to validate command arguments and append command to current transaction
+        //     transactions_[fd]->command_queue.emplace_back(routing_table_[it->second].get(), tokens);
+        //     return {RESP::encodeSimpleString("QUEUED")};
+        // }
         return routing_table_[it->second]->execute(tokens);
     }
 
@@ -363,5 +422,6 @@ public:
 private:
     std::unordered_map<CommandType, std::unique_ptr<Command>> routing_table_;
     std::unordered_map<std::string, CommandType> command_table_;
+    std::vector<std::unique_ptr<TransactionState>> transactions_;
     SharedDB db_;
 };
