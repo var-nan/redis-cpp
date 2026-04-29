@@ -7,6 +7,8 @@ file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
 set(CMAKE_CXX_STANDARD 23) # Enable the C++23 standard
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
+include_directories(${CMAKE_SOURCE_DIR}/src/include)
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     include(FetchContent)
     FetchContent_Declare(googletest GIT_REPOSITORY https://github.com/google/googletest.git

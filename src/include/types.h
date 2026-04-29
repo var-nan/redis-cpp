@@ -6,7 +6,7 @@
 #include <functional>
 #include <string_view>
 
-#include "include/RedisStream.hpp"
+#include "RedisStream.hpp"
 
 using RedisString = std::string;
 using RedisKey = std::string;

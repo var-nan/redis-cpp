@@ -133,6 +133,7 @@ void Server::run() {
             if (conn->intent & WANT_CLOSE) {
                 handle_disconnect(connections_[pollfds[i].fd].get());
                 connections_[pollfds[i].fd] = nullptr;
+                router_.clearTxn(pollfds[i].fd);
             }
         }
     }

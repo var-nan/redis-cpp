@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <functional>
 #include <memory>
+#include <typeinfo>
 
 #include "DataStore.hpp"
 
@@ -37,6 +38,11 @@ public:
     //     return "";
     // }
 
+};
+
+struct TransactionState {
+    bool is_active = false;
+    std::vector<std::pair<Command *, Tokens>> command_queue;
 };
 
 class EchoCommand : public Command {
@@ -309,6 +315,37 @@ private:
     SharedDB db_;
 };
 
+class MultiCommand : public Command {
+public:
+    MultiCommand(SharedDB db): db_{db}{ }
+
+    CommandResult execute(const Tokens& args) override;
+    CommandResult executeTxn(TransactionState *state);
+
+private:
+    SharedDB db_;
+};
+
+class ExecCommand : public Command {
+public:
+    ExecCommand(SharedDB db): db_{db}{ }
+
+    CommandResult execute(const Tokens& args) override;
+    CommandResult executeTxn(TransactionState *state);
+private:
+    SharedDB db_;
+};
+
+class DiscardCommand : public Command {
+public:
+    DiscardCommand(SharedDB db): db_{db} { }
+
+    CommandResult execute(const Tokens& args) override;
+    CommandResult executeTxn(TransactionState *state);
+private:
+    SharedDB db_;
+};
+
 
 enum CommandType {
     PING,
@@ -330,101 +367,3 @@ enum CommandType {
     DISCARD,
 };
 
-struct TransactionState {
-    bool is_active = false;
-    std::vector<std::pair<Command *, Tokens>> command_queue;
-};
-
-class CommandRouter {
-public:
-    explicit CommandRouter(SharedDB db): db_{db} {
-
-        command_table_["PING"] = CommandType::PING;
-        command_table_["ECHO"] = CommandType::ECHO;
-        command_table_["SET"] = CommandType::SET;
-        command_table_["GET"] = CommandType::GET;
-        command_table_["RPUSH"] = CommandType::RPUSH;
-        command_table_["RPOP"] = CommandType::RPOP;
-        command_table_["LRANGE"] = CommandType::LRANGE;
-        command_table_["LPUSH"] = CommandType::LPUSH;
-        command_table_["LLEN"] = CommandType::LLEN;
-        command_table_["LPOP"] = CommandType::LPOP;
-        command_table_["BLPOP"] = CommandType::BLPOP;
-        command_table_["TYPE"] = CommandType::TYPE;
-        command_table_["MULTI"] = CommandType::MULTI;
-        command_table_["INCR"] = CommandType::INCR;
-
-        routing_table_[command_table_["PING"]] = std::make_unique<PingCommand>();
-        routing_table_[command_table_["ECHO"]] = std::make_unique<EchoCommand>();
-        routing_table_[command_table_["SET"]] = std::make_unique<SetCommand>(db_);
-        routing_table_[command_table_["GET"]] = std::make_unique<GetCommand>(db_);
-        routing_table_[command_table_["RPUSH"]] = std::make_unique<RPushCommand>(db_);
-        routing_table_[command_table_["LRANGE"]] = std::make_unique<LRangeCommand>(db_);
-        routing_table_[command_table_["LPUSH"]] = std::make_unique<LPushCommand>(db_);
-        routing_table_[command_table_["LLEN"]] = std::make_unique<LLenCommand>(db_);
-        routing_table_[command_table_["LPOP"]] = std::make_unique<LPopCommand>(db_);
-        routing_table_[command_table_["BLPOP"]] = std::make_unique<BLPopCommand>(db_);
-        routing_table_[command_table_["TYPE"]] = std::make_unique<TypeCommand>(db_);
-        routing_table_[command_table_["INCR"]] = std::make_unique<IncrCommand>(db_);
-        
-        // TODO; add more later.
-    }
-
-    CommandResult routeCommand(const Tokens& tokens, int fd) {
-        if (tokens.empty()) return RESP::encodeError("empty command");
-        
-        std::string command_name = tokens[0];
-        std::transform(command_name.begin(), command_name.end(), command_name.begin(),
-            [](unsigned char c) { return std::toupper(c); });
-
-        auto it = command_table_.find(command_name);
-        if (it == command_table_.end()) return "-ERR unknown command '" + command_name + "' \r\n";
-
-        // if (it->second == CommandType::MULTI) {
-        //     // if (transactions_[fd]->is_active) ? if already a transaction exist? 
-        //     transactions_[fd]->is_active = true;
-        //     return {RESP::encodeSimpleString("OK")};
-        // } else if (it->second == CommandType::EXEC) {
-        //     // return error if no active transaction found.
-        //     // execute transaction.
-        //     auto txn_ptr = transactions_[fd].get();
-        //     std::vector<std::string> cmd_results;
-        //     cmd_results.reserve(txn_ptr->command_queue.size());
-            
-        //     for (const auto& [cmd, args] : txn_ptr->command_queue) {
-        //         cmd_results.push_back(std::move(cmd->execute(args).response));
-        //     }
-        //     return {RESP::encodeSequence(cmd_results.begin(), cmd_results.end())}; 
-        // } else if (it->second == CommandType::DISCARD) {
-        //     auto txn_ptr = transactions_[fd].get();
-        //     if (!txn_ptr->is_active) return {RESP::encodeError("DISCARD without MULTI")};
-        //     // clear transaction state.
-        //     txn_ptr->is_active = false;
-        //     txn_ptr->command_queue.clear();
-        //     return {RESP::encodeSimpleString("OK")};
-        // } else if (transactions_[fd]->is_active) {
-        //     // No need to validate command arguments and append command to current transaction
-        //     transactions_[fd]->command_queue.emplace_back(routing_table_[it->second].get(), tokens);
-        //     return {RESP::encodeSimpleString("QUEUED")};
-        // }
-        return routing_table_[it->second]->execute(tokens);
-    }
-
-    CommandType getCommand(std::string s) {
-        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::toupper(c);});
-        
-        auto it = command_table_.find(s);
-        if (it == command_table_.end()) return CommandType::NONE;
-        return it->second;
-    }
-
-    std::string getTimeoutResponse(CommandType cmd_type) {
-        return routing_table_[cmd_type]->getTimeoutResponse(); 
-    }
-
-private:
-    std::unordered_map<CommandType, std::unique_ptr<Command>> routing_table_;
-    std::unordered_map<std::string, CommandType> command_table_;
-    std::vector<std::unique_ptr<TransactionState>> transactions_;
-    SharedDB db_;
-};

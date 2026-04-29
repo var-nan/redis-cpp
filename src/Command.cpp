@@ -69,3 +69,49 @@ CommandResult IncrCommand::execute(const Tokens& args) {
     *str_ptr = std::to_string(value);
     return {RESP::encodeInteger(value)};
 }
+
+CommandResult MultiCommand::executeTxn(TransactionState *state) {
+
+    // if already a transaction?
+    if (state->is_active) return {RESP::encodeError("Already transaction")};
+
+    state->is_active = true;
+    return {RESP::encodeSimpleString("OK")};
+}
+
+CommandResult MultiCommand::execute(const Tokens& args) {
+    return {RESP::encodeSimpleString("OK")};
+}
+
+CommandResult ExecCommand::execute(const Tokens& args) {
+    return {RESP::encodeSimpleString("OK")};
+}
+
+CommandResult ExecCommand::executeTxn(TransactionState *state) {
+    if (!state || !state->is_active)
+        return {RESP::encodeError("EXEC without MULTI")};
+
+    std::vector<std::string> cmd_results;
+    cmd_results.reserve(state->command_queue.size());
+    
+    for (const auto& [cmd, args] : state->command_queue) {
+        cmd_results.push_back(std::move(cmd->execute(args).response));
+    }
+    // clear transaction state
+    state->is_active = false;
+    state->command_queue.clear();
+
+    return {RESP::encodeSequence(cmd_results.begin(), cmd_results.end())}; 
+}
+
+CommandResult DiscardCommand::execute(const Tokens& args) {
+    return {RESP::encodeSimpleString("OK")};
+}
+
+CommandResult DiscardCommand::executeTxn(TransactionState *state) {
+    if (!state->is_active) return {RESP::encodeError("DISCARD without MULTI")};
+
+    state->is_active = false;
+    state->command_queue.clear();
+    return {RESP::encodeSimpleString("OK")};
+}

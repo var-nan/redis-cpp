@@ -2,7 +2,7 @@
 
 
 #include <gtest/gtest.h>
-#include "../src/Server.hpp"
+#include "Server.hpp"
 
 TEST (test1, test1) {
     std::string cmd = "*2\r\n$4\r\nECHO\r\n$3\r\nHey\r\n";
