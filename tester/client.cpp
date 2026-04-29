@@ -66,23 +66,25 @@ int main(int argc, char **argv) {
       return RESP::encodeSequence(args.begin(), args.end());
    };
 
+   auto send_command = [&](const std::vector<std::string>& args) {
+      std::string q_q = RESP::encodeSequence(args.begin(), args.end());
+      send_q(q_q);
+      receive_q(); 
+   };
+
    {
       std::vector<std::string> tokens = {"MULTI"};
-      std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
-      send_q(set_q);
-      receive_q();
-      for (int i = 0; i < 3; i++) {
-         std::vector<std::string> tokens2 = {"incr", "foo"};
-         std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
-         send_q(get_q);
-         receive_q();
-         
-      }
+      send_command(tokens);
 
-      std::vector<std::string> exec_tokens = {"EXEC"};
-      std::string exec_q = RESP::encodeSequence(exec_tokens.begin(), exec_tokens.end());
-      send_q(exec_q);
-      receive_q();
+      tokens = {"SET" , "grape" , "66"};
+      send_command(tokens);
+      tokens = {"INCR", "grape"};
+      send_command(tokens);
+      tokens = {"INCR", "blueberry"};
+      send_command(tokens);
+      tokens = {"EXEC"};
+      send_command(tokens);
+    
    }
    close(sock);
    return 0;
