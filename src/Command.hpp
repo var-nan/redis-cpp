@@ -33,9 +33,9 @@ public:
     virtual std::string getTimeoutResponse() const {
         return RESP::encodeNil();
     }
-    virtual std::string validateArgs(const Tokens& args) const {
-        return "";
-    }
+    // virtual std::string validateArgs(const Tokens& args) const {
+    //     return "";
+    // }
 
 };
 
@@ -49,6 +49,7 @@ public:
 
 class PingCommand : public Command {
 public:
+    PingCommand() = default;
     CommandResult execute(const Tokens& args) override {
         return {RESP::encodeSimpleString("PONG")};
     }
@@ -351,6 +352,7 @@ public:
         command_table_["BLPOP"] = CommandType::BLPOP;
         command_table_["TYPE"] = CommandType::TYPE;
         command_table_["MULTI"] = CommandType::MULTI;
+        command_table_["INCR"] = CommandType::INCR;
 
         routing_table_[command_table_["PING"]] = std::make_unique<PingCommand>();
         routing_table_[command_table_["ECHO"]] = std::make_unique<EchoCommand>();

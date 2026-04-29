@@ -68,15 +68,15 @@ int main(int argc, char **argv) {
 
    {
       for (int i = 0; i < 1; i++) {
-         std::vector<std::string> tokens = {"set", "foo", "axy"};
+         std::vector<std::string> tokens = {"PING"};
          std::string set_q = RESP::encodeSequence(tokens.begin(), tokens.end());
          send_q(set_q);
          receive_q();
          
-         std::vector<std::string> tokens2 = {"incr", "foo"};
-         std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
-         send_q(get_q);
-         receive_q();
+         // std::vector<std::string> tokens2 = {"incr", "foo"};
+         // std::string get_q = RESP::encodeSequence(tokens2.begin(), tokens2.end());
+         // send_q(get_q);
+         // receive_q();
          
       }
    }
