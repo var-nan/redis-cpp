@@ -50,7 +50,7 @@ public:
 class PingCommand : public Command {
 public:
     CommandResult execute(const Tokens& args) override {
-        return std::string("+PONG\r\n");
+        return {RESP::encodeSimpleString("PONG")};
     }
 };
 
@@ -69,11 +69,11 @@ public:
         } else if (args[3] == "EX" && args.size() == 5) {
             expiry = Clock::now() + std::chrono::seconds(std::stoul(args[4]));
         } else {
-            return RESP::encodeError("wrong number of arguments for 'SET' command");
+            return {RESP::encodeError("wrong number of arguments for 'SET' command")};
         }
 
         _db->set(args[1], args[2], expiry);
-        return RESP::encodeOK();
+        return {RESP::encodeOK()};
     }
 
 private:
@@ -85,13 +85,14 @@ public:
     explicit GetCommand(SharedDB db) : _db{db}{}
 
     CommandResult execute(const Tokens& args) override {
-        if (args.size() < 2) return RESP::encodeError("wrong number of arguments for 'GET' command");
+        if (args.size() < 2) 
+            return {RESP::encodeError("wrong number of arguments for 'GET' command")};
         auto result = _db->get(args[1]);
-        if (!result) return RESP::encodeNil();
+        if (!result) return {RESP::encodeNil()};
 
         auto str_ptr = std::get_if<RedisString>(result);
-        if (!str_ptr) return RESP::encodeError("value is not a string");
-        return RESP::encodeStr(*str_ptr);
+        if (!str_ptr) return {RESP::encodeError("value is not a string")};
+        return {RESP::encodeStr(*str_ptr)};
     }
 
 private:
@@ -126,16 +127,16 @@ public:
 
     CommandResult execute(const Tokens& args) override {
         if (args.size() != 4) 
-            return RESP::encodeError("wrong number of arguments for 'LRANGE' command");
+            return {RESP::encodeError("wrong number of arguments for 'LRANGE' command")};
         
         std::vector<std::string> empty_seq;
 
         const RedisKey& key = args[1];
         auto ptr = _db->get(key);
-        if (!ptr) return RESP::encodeSequence(empty_seq.end(), empty_seq.end());
+        if (!ptr) return {RESP::encodeSequence(empty_seq.end(), empty_seq.end())};
 
         auto list_ptr = std::get_if<RedisList>(ptr);
-        if (!list_ptr) return RESP::encodeError("element is not of type list.");
+        if (!list_ptr) return {RESP::encodeError("element is not of type list.")};
 
         long first = std::stoll(args[2]), last = std::stoll(args[3]);
         long size = list_ptr->size();
@@ -143,13 +144,13 @@ public:
 
         if (last < 0) last = size + last;
         if (last < 0) 
-            return RESP::encodeSequence(empty_seq.end(), empty_seq.end());
+            return {RESP::encodeSequence(empty_seq.end(), empty_seq.end())};
         if (first < 0) first = size + first; 
         if (first < 0) first = 0;
         if ((first > last) || (first >= size)) // return empty sequence.
-            return RESP::encodeSequence(empty_seq.end(), empty_seq.end());
+            return {RESP::encodeSequence(empty_seq.end(), empty_seq.end())};
         
-        return RESP::encodeSequence(list_ptr->begin()+first, list_ptr->begin()+(last+1));
+        return {RESP::encodeSequence(list_ptr->begin()+first, list_ptr->begin()+(last+1))};
     }
 private:
     SharedDB _db;
@@ -208,16 +209,16 @@ public:
 
     CommandResult execute(const Tokens& args) override {
         if (args.size() != 2) 
-            return RESP::encodeError("wrong number of arguments for 'LLEN' command");
+            return {RESP::encodeError("wrong number of arguments for 'LLEN' command")};
 
         const RedisKey& key = args[1];
         auto ptr = _db->get(key);
         if (!ptr) return RESP::encodeInteger(0);
 
         auto list_ptr = std::get_if<RedisList>(ptr);
-        if (!list_ptr) return RESP::encodeError("value is not of type list");
+        if (!list_ptr) return {RESP::encodeError("value is not of type list")};
 
-        return RESP::encodeInteger(static_cast<long>(list_ptr->size()));
+        return {RESP::encodeInteger(static_cast<long>(list_ptr->size()))};
     }
 private:
     SharedDB _db;
@@ -241,18 +242,18 @@ public:
 
     CommandResult execute(const Tokens& args) override {
         if ((args.size() < 2) || (args.size() > 3)) 
-            return RESP::encodeError("wrong number of arguments for 'LPOP' command");
+            return {RESP::encodeError("wrong number of arguments for 'LPOP' command")};
 
         long n = (args.size() == 3) ? std::stol(args[2]) : 1;
-        if (n < 0) return RESP::encodeError("wrong number of arguments for 'LPOP' command");
+        if (n < 0) return {RESP::encodeError("wrong number of arguments for 'LPOP' command")};
 
         const RedisKey& key = args[1];
         auto ptr = _db->get(key);
-        if (!ptr || (n == 0)) return RESP::encodeNil();
+        if (!ptr || (n == 0)) return {RESP::encodeNil()};
 
         auto list_ptr = std::get_if<RedisList>(ptr);
-        if (!list_ptr) return RESP::encodeError("value is not of type list");
-        if (list_ptr->empty()) return RESP::encodeNil();
+        if (!list_ptr) return {RESP::encodeError("value is not of type list")};
+        if (list_ptr->empty()) return {RESP::encodeNil()};
 
         n = std::min(n, static_cast<long>(list_ptr->size()));
         
