@@ -101,7 +101,7 @@ CommandResult ExecCommand::executeTxn(TransactionState *state) {
     state->is_active = false;
     state->command_queue.clear();
 
-    return {RESP::encodeSequence(cmd_results.begin(), cmd_results.end())}; 
+    return {RESP::encodeCmdResponses(cmd_results.begin(), cmd_results.end())}; 
 }
 
 CommandResult DiscardCommand::execute(const Tokens& args) {

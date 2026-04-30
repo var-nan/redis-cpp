@@ -134,6 +134,7 @@ void Server::run() {
                 handle_disconnect(connections_[pollfds[i].fd].get());
                 connections_[pollfds[i].fd] = nullptr;
                 router_.clearTxn(pollfds[i].fd);
+                std::cout << "Client Disconnected " << pollfds[i].fd << std::endl;
             }
         }
     }

@@ -77,11 +77,11 @@ int main(int argc, char **argv) {
       send_command(tokens);
 
       tokens = {"SET" , "grape" , "66"};
-      send_command(tokens);
+      // send_command(tokens);
       tokens = {"INCR", "grape"};
-      send_command(tokens);
+      // send_command(tokens);
       tokens = {"INCR", "blueberry"};
-      send_command(tokens);
+      // send_command(tokens);
       tokens = {"EXEC"};
       send_command(tokens);
     

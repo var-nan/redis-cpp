@@ -5,6 +5,7 @@
 #include <array>
 #include <functional>
 #include <string_view>
+#include <numeric>
 
 #include "RedisStream.hpp"
 
@@ -37,6 +38,24 @@ namespace RESP {
 
         for (It current = first; current != last; ++current) {
             result += encodeStr(*current);
+        }
+        return result;
+    }
+
+    template <typename It>
+    inline std::string encodeCmdResponses(It first, It last) {
+
+        size_t n_elements = std::distance(first, last);
+        size_t n_chars = std::accumulate(first, last, 0, [](size_t c, const std::string& s){
+            return c + s.size();
+        });
+
+        size_t space_required = n_chars + 6;
+        std::string result;
+        result.reserve(space_required);
+        result = "*" + std::to_string(n_elements) + "\r\n";
+        for (It current = first; current != last; ++current) {
+            result += *current;
         }
         return result;
     }
