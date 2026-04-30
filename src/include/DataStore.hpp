@@ -59,4 +59,5 @@ public:
 
 private:
     std::unordered_map<RedisKey,Value> _store;
+    std::unordered_map<RedisKey, std::pair<ulong, ulong>> ref_counts_;
 };

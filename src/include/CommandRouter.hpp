@@ -20,10 +20,12 @@ public:
         command_table_["INCR"] = CommandType::INCR;
         command_table_["EXEC"] = CommandType::EXEC;
         command_table_["DISCARD"] = CommandType::DISCARD;
+        command_table_["WATCH"] = CommandType::WATCH;
+        command_table_["UNWATCH"] = CommandType::UNWATCH;
 
         routing_table_[command_table_["PING"]] = std::make_unique<PingCommand>();
         routing_table_[command_table_["ECHO"]] = std::make_unique<EchoCommand>();
-        routing_table_[command_table_["SET"]] = std::make_unique<SetCommand>(db_);
+        routing_table_[command_table_["SET"]] = std::make_unique<SetCommand>(db_, &ctx_);
         routing_table_[command_table_["GET"]] = std::make_unique<GetCommand>(db_);
         routing_table_[command_table_["RPUSH"]] = std::make_unique<RPushCommand>(db_);
         routing_table_[command_table_["LRANGE"]] = std::make_unique<LRangeCommand>(db_);
@@ -33,9 +35,11 @@ public:
         routing_table_[command_table_["BLPOP"]] = std::make_unique<BLPopCommand>(db_);
         routing_table_[command_table_["TYPE"]] = std::make_unique<TypeCommand>(db_);
         routing_table_[command_table_["INCR"]] = std::make_unique<IncrCommand>(db_);
-        routing_table_[command_table_["MULTI"]] = std::make_unique<MultiCommand>(db_);
-        routing_table_[command_table_["EXEC"]] = std::make_unique<ExecCommand>(db_);
-        routing_table_[command_table_["DISCARD"]] = std::make_unique<DiscardCommand>(db_);
+        routing_table_[command_table_["MULTI"]] = std::make_unique<MultiCommand>(db_, &ctx_);
+        routing_table_[command_table_["EXEC"]] = std::make_unique<ExecCommand>(db_, &ctx_);
+        routing_table_[command_table_["DISCARD"]] = std::make_unique<DiscardCommand>(db_, &ctx_);
+        routing_table_[command_table_["WATCH"]] = std::make_unique<WatchCommand>(db_, &ctx_);
+        routing_table_[command_table_["UNWATCH"]] = std::make_unique<UnwatchCommand>(db_, &ctx_);
         
         // TODO; add more later.
     }
@@ -50,25 +54,22 @@ public:
         auto it = command_table_.find(command_name);
         if (it == command_table_.end()) return "-ERR unknown command '" + command_name + "' \r\n";
 
-        if (transactions_.size() <= fd) {
-            transactions_.reserve(fd+1);
-            for (int i = transactions_.size(); i < (fd+1); i++) {
-                transactions_.emplace_back(std::make_unique<TransactionState>());
+        if (ctx_.transactions.size() <= fd) {
+            ctx_.transactions.reserve(fd+1);
+            for (int i = ctx_.transactions.size(); i < (fd+1); i++) {
+                ctx_.transactions.emplace_back(std::make_unique<TransactionState>());
             }
         }
         auto cmd_ptr = routing_table_[it->second].get();
-        if (it->second == CommandType::MULTI) {
-            auto ptr = dynamic_cast<MultiCommand *>(cmd_ptr);
-            return ptr->executeTxn(transactions_[fd].get());
-        } else if (it->second == CommandType::EXEC) {
-            auto ptr = dynamic_cast<ExecCommand *>(routing_table_[it->second].get());
-            return ptr->executeTxn(transactions_[fd].get());
-        } else if (it->second == CommandType::DISCARD) {
-            auto ptr = dynamic_cast<DiscardCommand *>(cmd_ptr);
-            return ptr->executeTxn(transactions_[fd].get());
-        } else if (transactions_[fd]->is_active) {
-            // No need to validate command arguments.
-            transactions_[fd]->command_queue.emplace_back(routing_table_[it->second].get(), tokens);
+        ctx_.fd = fd;
+        if (it->second == CommandType::MULTI || 
+            it->second == CommandType::EXEC  || 
+            it->second == CommandType::DISCARD) {
+            return cmd_ptr->execute(tokens);
+        } else if (ctx_.transactions[fd]->is_active) {
+            if (it->second == CommandType::WATCH)
+                return {RESP::encodeError("WATCH inside MULTI is not allowed")};
+            ctx_.transactions[fd]->command_queue.emplace_back(cmd_ptr, tokens);
             return {RESP::encodeSimpleString("QUEUED")};
         }
         return cmd_ptr->execute(tokens);
@@ -87,13 +88,17 @@ public:
     }
 
     void clearTxn(int idx) {
-        transactions_[idx]->is_active = false;
-        transactions_[idx]->command_queue.clear();
+        ctx_.transactions[ctx_.fd]->is_active = false;
+        ctx_.transactions[ctx_.fd]->command_queue.clear();
+        // transactions_[idx]->is_active = false;
+        // transactions_[idx]->command_queue.clear();
     }
 
 private:
     std::unordered_map<CommandType, std::unique_ptr<Command>> routing_table_;
     std::unordered_map<std::string, CommandType> command_table_;
-    std::vector<std::unique_ptr<TransactionState>> transactions_;
+    
+    TransactionContext ctx_;
+    // key -> pair of ref-count, epoch count.
     SharedDB db_;
 };

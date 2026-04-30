@@ -43,6 +43,40 @@ public:
 struct TransactionState {
     bool is_active = false;
     std::vector<std::pair<Command *, Tokens>> command_queue;
+    std::vector<std::pair<RedisString, ulong>> watched_keys; // keys current transaction is watching.
+
+    void clear() {
+        // clear transaction state.
+        is_active = false;
+        command_queue.clear();
+        watched_keys.clear(); // Watched keys can also be cleared with UNWATCH or DISCORD.
+    }
+};
+
+struct ValueEpoch {
+    ulong ref_count = 0;
+    ulong updated_at = 0;
+
+    ValueEpoch() = default;
+    ValueEpoch(ulong a, ulong b): ref_count{a}, updated_at{b} { }
+};
+
+struct TransactionContext {
+    std::vector<std::unique_ptr<TransactionState>> transactions;
+    std::unordered_map<RedisKey, ValueEpoch> watched_keys;
+    int fd;
+
+    void clearWatchedKeys(const std::vector<std::pair<RedisKey, ulong>>& keys) {
+        for (const auto& [k, ts]: keys) {
+            if (auto it = watched_keys.find(k); it != watched_keys.end()) {
+                auto& e = it->second;
+                e.ref_count--;
+                if (e.ref_count == 0) {
+                    watched_keys.erase(it);
+                }
+            }
+        }
+    }
 };
 
 class EchoCommand : public Command {
@@ -63,28 +97,12 @@ public:
 
 class SetCommand : public Command {
 public:
-    explicit SetCommand(SharedDB db): _db{db} {}
+    explicit SetCommand(SharedDB db, TransactionContext *ctx): _db{db}, ctx_{ctx} {}
 
-    CommandResult execute(const Tokens& args) override {
-        if (args.size() < 3) return RESP::encodeError("wrong number of arguments for 'SET' command");
-
-        Clock::time_point expiry;
-        if (args.size() == 3) {
-            expiry = Clock::time_point::max();
-        } else if (args[3] == "PX" && args.size() == 5) {
-            expiry = Clock::now() + std::chrono::milliseconds(std::stoul(args[4]));
-        } else if (args[3] == "EX" && args.size() == 5) {
-            expiry = Clock::now() + std::chrono::seconds(std::stoul(args[4]));
-        } else {
-            return {RESP::encodeError("wrong number of arguments for 'SET' command")};
-        }
-
-        _db->set(args[1], args[2], expiry);
-        return {RESP::encodeOK()};
-    }
-
+    CommandResult execute(const Tokens& args) override;
 private:
     SharedDB _db;
+    TransactionContext *ctx_;
 };
 
 class GetCommand : public Command {
@@ -317,33 +335,52 @@ private:
 
 class MultiCommand : public Command {
 public:
-    MultiCommand(SharedDB db): db_{db}{ }
+    MultiCommand(SharedDB db, TransactionContext *ctx): db_{db}, ctx_{ctx} { }
 
     CommandResult execute(const Tokens& args) override;
-    CommandResult executeTxn(TransactionState *state);
-
 private:
     SharedDB db_;
+    TransactionContext *ctx_;
 };
 
 class ExecCommand : public Command {
 public:
-    ExecCommand(SharedDB db): db_{db}{ }
+    ExecCommand(SharedDB db, TransactionContext *ctx): db_{db}, ctx_{ctx} { }
 
     CommandResult execute(const Tokens& args) override;
-    CommandResult executeTxn(TransactionState *state);
 private:
     SharedDB db_;
+    TransactionContext *ctx_;
 };
 
 class DiscardCommand : public Command {
 public:
-    DiscardCommand(SharedDB db): db_{db} { }
+    DiscardCommand(SharedDB db, TransactionContext *ctx): db_{db}, ctx_{ctx} { }
 
     CommandResult execute(const Tokens& args) override;
-    CommandResult executeTxn(TransactionState *state);
 private:
     SharedDB db_;
+    TransactionContext *ctx_;
+};
+
+class WatchCommand : public Command {
+public:
+    WatchCommand(SharedDB db, TransactionContext *ctx): db_{db}, ctx_{ctx} { }
+
+    CommandResult execute (const Tokens& args) override;
+private:
+    SharedDB db_;
+    TransactionContext *ctx_;
+};
+
+class UnwatchCommand : public Command {
+public:
+    UnwatchCommand(SharedDB db, TransactionContext *ctx): db_{db}, ctx_{ctx} { }
+
+    CommandResult execute(const Tokens& args) override;
+private:
+    SharedDB db_;
+    TransactionContext *ctx_;
 };
 
 
@@ -365,5 +402,7 @@ enum CommandType {
     MULTI,
     EXEC,
     DISCARD,
+    WATCH,
+    UNWATCH,
 };
 

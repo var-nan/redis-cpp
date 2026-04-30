@@ -73,16 +73,11 @@ int main(int argc, char **argv) {
    };
 
    {
-      std::vector<std::string> tokens = {"MULTI"};
-      send_command(tokens);
+      std::vector<std::string> tokens;
 
       tokens = {"SET" , "grape" , "66"};
-      // send_command(tokens);
-      tokens = {"INCR", "grape"};
-      // send_command(tokens);
-      tokens = {"INCR", "blueberry"};
-      // send_command(tokens);
-      tokens = {"EXEC"};
+      send_command(tokens);
+      tokens = {"WATCH", "grape"};
       send_command(tokens);
     
    }
