@@ -11,6 +11,7 @@
 #include <vector>
 #include <thread>
 #include <climits>
+#include <sstream>
 
 
 #define BUFFER_SIZE 256
@@ -73,13 +74,17 @@ int main(int argc, char **argv) {
    };
 
    {
-      std::vector<std::string> tokens;
-
-      tokens = {"SET" , "grape" , "66"};
-      send_command(tokens);
-      tokens = {"WATCH", "grape"};
-      send_command(tokens);
-    
+      std::string ss;
+      while (std::getline(std::cin, ss)) {
+         std::vector<std::string> tokens;
+         std::istringstream iss{ss};
+         std::string temp;
+         while (iss >> temp) {
+            tokens.push_back(temp);
+         }
+         if (tokens.empty()) break;
+         send_command(tokens);
+      }
    }
    close(sock);
    return 0;

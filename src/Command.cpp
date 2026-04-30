@@ -151,7 +151,7 @@ CommandResult WatchCommand::execute(const Tokens& args) {
     // for all the given keys, insert them to client's watch list.
     for (auto current = args.cbegin()+1; current != args.cend(); ++current) {
         auto it = counts_map.find(*current);
-        ulong ts = 1;
+        ulong ts = 0;
         // increase reference count and insert to client's watch list.
         // if key not present, insert to watch list. If other request sets the key, it should start with 1.
         if (it != counts_map.end()){ // if key not present, insert to watch list.
